@@ -22,24 +22,28 @@ const CategoryButtons: React.FC<CategoryButtonsProps> = ({
         </button>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-        {Object.entries(categories).map(([category, data]) => (
-          <button
-            key={category}
-            onClick={() => onCategoryClick(category, data)}
-            className={`px-4 py-2 rounded-lg text-left transition-colors flex justify-between items-center ${
-              selectedCategory === category
-                ? 'bg-indigo-600 text-white'
-                : `${STYLES.background} ${STYLES.textMuted} ${STYLES.hover}`
-            }`}
-          >
-            <span className="font-medium truncate">{category}</span>
-            <span className={`ml-2 text-base font-bold whitespace-nowrap ${
-              data.total >= 0 ? STYLES.positiveAmount : STYLES.negativeAmount
-            }`}>
-              {data.total.toLocaleString('ru-RU', CURRENCY_FORMAT_OPTIONS)}
-            </span>
-          </button>
-        ))}
+        {Object.entries(categories).map(([category, data]) => {
+          const total = data && typeof data.total === 'number' ? data.total : 0;
+          
+          return (
+            <button
+              key={category}
+              onClick={() => onCategoryClick(category, data)}
+              className={`px-4 py-2 rounded-lg text-left transition-colors flex justify-between items-center ${
+                selectedCategory === category
+                  ? 'bg-indigo-600 text-white'
+                  : `${STYLES.background} ${STYLES.textMuted} ${STYLES.hover}`
+              }`}
+            >
+              <span className="font-medium truncate">{category}</span>
+              <span className={`ml-2 text-base font-bold whitespace-nowrap ${
+                total >= 0 ? STYLES.positiveAmount : STYLES.negativeAmount
+              }`}>
+                {total.toLocaleString('ru-RU', CURRENCY_FORMAT_OPTIONS)}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

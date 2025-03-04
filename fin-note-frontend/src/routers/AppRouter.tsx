@@ -1,5 +1,10 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { 
+  Navigate, 
+  Route,
+  Routes,
+  BrowserRouter
+} from 'react-router-dom';
 import SignIn from '../pages/auth/SignIn';
 import SignUp from '../pages/auth/SignUp';
 import ExcelAnalyzer from '../pages/ExcelAnalyzer';
@@ -12,20 +17,14 @@ const PrivateRoute: React.FC<{ element: React.ReactElement }> = ({ element }) =>
 
 const AppRouter: React.FC = () => {
   return (
-    <Router>
+    <BrowserRouter>
       <Routes>
-        <Route
-          path="/"
-          element={<Navigate to="/excel" replace />}
-        />
+        <Route path="/" element={<Navigate to="/excel" replace />} />
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
-        <Route
-          path="/excel"
-          element={<PrivateRoute element={<ExcelAnalyzer />} />}
-        />
+        <Route path="/excel" element={<PrivateRoute element={<ExcelAnalyzer />} />} />
       </Routes>
-    </Router>
+    </BrowserRouter>
   );
 };
 

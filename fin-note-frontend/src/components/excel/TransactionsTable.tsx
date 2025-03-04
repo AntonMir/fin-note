@@ -20,7 +20,17 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
   const getSelectedTotal = () => {
     return currentData.transactions
       .filter((_, index) => selectedTransactions[index])
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+  };
+
+  const formatNumber = (value: number | null | undefined) => {
+    const safeValue = typeof value === 'number' ? value : 0;
+    return safeValue.toLocaleString('ru-RU', CURRENCY_FORMAT_OPTIONS);
+  };
+
+  const formatNumberWithSign = (value: number | null | undefined) => {
+    const safeValue = typeof value === 'number' ? value : 0;
+    return safeValue.toLocaleString('ru-RU', CURRENCY_FORMAT_OPTIONS_WITH_SIGN);
   };
 
   return (
@@ -33,22 +43,22 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
             <p className={`text-base font-medium mt-2 ${STYLES.text}`}>
               Общая сумма: {' '}
               <span className={`text-lg font-bold ${
-                currentData.total >= 0 ? STYLES.positiveAmount : STYLES.negativeAmount
+                (currentData.total || 0) >= 0 ? STYLES.positiveAmount : STYLES.negativeAmount
               }`}>
-                {currentData.total.toLocaleString('ru-RU', CURRENCY_FORMAT_OPTIONS)}
+                {formatNumber(currentData.total)}
               </span>
             </p>
             <p className={`text-base font-medium ${STYLES.text}`}>
               Общий кэшбэк: {' '}
               <span className={`text-lg font-bold ${STYLES.cashback}`}>
-                {currentData.totalCashback.toLocaleString('ru-RU', CURRENCY_FORMAT_OPTIONS)}
+                {formatNumber(currentData.totalCashback)}
               </span>
             </p>
             {hasSelectedTransactions && (
               <p className={`text-base font-medium mt-2 ${STYLES.text}`}>
                 Выбрано: {' '}
                 <span className={`text-lg font-bold ${STYLES.selected}`}>
-                  {getSelectedTotal().toLocaleString('ru-RU', CURRENCY_FORMAT_OPTIONS)}
+                  {formatNumber(getSelectedTotal())}
                 </span>
               </p>
             )}
@@ -118,9 +128,9 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
                   {transaction.date}
                 </td>
                 <td className={`px-6 py-4 whitespace-nowrap text-base font-bold ${
-                  transaction.amount > 0 ? STYLES.positiveAmount : STYLES.negativeAmount
+                  (transaction.amount || 0) > 0 ? STYLES.positiveAmount : STYLES.negativeAmount
                 }`}>
-                  {transaction.amount.toLocaleString('ru-RU', CURRENCY_FORMAT_OPTIONS_WITH_SIGN)}
+                  {formatNumberWithSign(transaction.amount)}
                 </td>
                 <td className={`px-6 py-4 whitespace-nowrap text-sm ${STYLES.textMuted}`}>
                   {transaction.description}
