@@ -5,7 +5,6 @@ interface Transaction {
   amount: number;
   description: string;
   category: string;
-  originalCategory: string;
   mccCode: string;
   status: string;
   paymentType: string;
@@ -20,55 +19,29 @@ interface CategoryData {
 }
 
 interface TableState {
-  shopCategories: { [key: string]: CategoryData };
-  budgetCategories: { [key: string]: CategoryData };
-  transferHistory: {
-    timestamp: string;
-    fromCategory: string;
-    toCategory: string;
-    transactions: Transaction[];
-  }[];
+  categories: { [key: string]: CategoryData };
 }
 
 const initialState: TableState = {
-  shopCategories: {},
-  budgetCategories: {},
-  transferHistory: [],
+  categories: {},
 };
 
 const tableSlice = createSlice({
   name: 'tables',
   initialState,
   reducers: {
-    setShopCategories: (state, action: PayloadAction<{ [key: string]: CategoryData }>) => {
-      state.shopCategories = action.payload;
-    },
-    setBudgetCategories: (state, action: PayloadAction<{ [key: string]: CategoryData }>) => {
-      state.budgetCategories = action.payload;
-    },
-    addTransferToHistory: (state, action: PayloadAction<{
-      fromCategory: string;
-      toCategory: string;
-      transactions: Transaction[];
-    }>) => {
-      state.transferHistory.push({
-        ...action.payload,
-        timestamp: new Date().toISOString(),
-      });
+    setCategories: (state, action: PayloadAction<{ [key: string]: CategoryData }>) => {
+      state.categories = action.payload;
     },
     loadStateFromJson: (state, action: PayloadAction<TableState>) => {
-      return action.payload;
+      state.categories = action.payload.categories;
     },
-    resetState: () => initialState,
+    resetState: (state) => {
+      state.categories = {};
+    },
   },
 });
 
-export const {
-  setShopCategories,
-  setBudgetCategories,
-  addTransferToHistory,
-  loadStateFromJson,
-  resetState,
-} = tableSlice.actions;
+export const { setCategories, loadStateFromJson, resetState } = tableSlice.actions;
 
 export default tableSlice.reducer; 
