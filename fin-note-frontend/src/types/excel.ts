@@ -1,27 +1,14 @@
-export interface Transaction {
-  date: string;
-  amount: number;
-  description: string;
-  category: string;
-  mccCode: string;
-  status: string;
-  paymentType: string;
-  cardNumber: string;
-  cashback: number;
-}
+import { Transaction as BankTransaction, CategoryData as BankCategoryData, Categories } from './banks';
 
-export interface CategoryData {
-  total: number;
-  totalCashback: number;
-  transactions: Transaction[];
-}
+export type Transaction = BankTransaction;
+export type CategoryData = BankCategoryData;
 
 export interface SelectedTransactions {
-  [key: string]: boolean;
+  [key: number]: boolean;
 }
 
 export interface SortConfig {
-  key: 'date' | 'amount' | 'category' | 'description' | 'cardNumber' | 'status' | null;
+  key: keyof Transaction | null;
   direction: 'asc' | 'desc' | null;
 }
 
@@ -29,7 +16,7 @@ export interface TransferMenuProps {
   isOpen: boolean;
   onClose: () => void;
   selectedCategory: string;
-  categories: Record<string, CategoryData>;
+  categories: Categories;
   onTransfer: (targetCategory: string) => void;
   hasSelectedTransactions: boolean;
 }
@@ -41,7 +28,7 @@ export interface AddCategoryModalProps {
 }
 
 export interface CategoryButtonsProps {
-  categories: Record<string, CategoryData>;
+  categories: Categories;
   selectedCategory: string;
   onCategoryClick: (category: string, data: CategoryData) => void;
   onAddCategoryClick: () => void;
@@ -53,7 +40,7 @@ export interface TransactionsTableProps {
   selectedTransactions: SelectedTransactions;
   onTransactionSelect: (index: number) => void;
   onSelectAll: () => void;
-  onSort: (key: SortConfig['key']) => void;
+  onSort: (key: keyof Transaction) => void;
   sortConfig: SortConfig;
   onTransferClick: () => void;
 } 

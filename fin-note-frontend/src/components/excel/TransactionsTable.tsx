@@ -1,6 +1,17 @@
 import React from 'react';
-import { TransactionsTableProps } from '../../types/excel';
-import { STYLES, CURRENCY_FORMAT_OPTIONS, CURRENCY_FORMAT_OPTIONS_WITH_SIGN, TABLE_COLUMNS } from '../../constants/excel';
+import { CategoryData, Transaction } from '../../types/banks';
+import { SelectedTransactions, SortConfig } from '../../types/excel';
+
+interface TransactionsTableProps {
+  currentData: CategoryData;
+  selectedCategory: string;
+  selectedTransactions: SelectedTransactions;
+  onTransactionSelect: (index: number) => void;
+  onSelectAll: () => void;
+  onSort: (key: keyof Transaction) => void;
+  sortConfig: SortConfig;
+  onTransferClick: () => void;
+}
 
 const TransactionsTable: React.FC<TransactionsTableProps> = ({
   currentData,
@@ -12,135 +23,143 @@ const TransactionsTable: React.FC<TransactionsTableProps> = ({
   sortConfig,
   onTransferClick
 }) => {
-  if (!currentData) return null;
-
-  const allSelected = currentData.transactions.every((_, index) => selectedTransactions[index]);
-  const hasSelectedTransactions = Object.values(selectedTransactions).some(isSelected => isSelected);
-  
-  const getSelectedTotal = () => {
-    return currentData.transactions
-      .filter((_, index) => selectedTransactions[index])
-      .reduce((sum, t) => sum + (t.amount || 0), 0);
+  const renderSortArrow = (key: keyof Transaction) => {
+    if (sortConfig.key !== key) return null;
+    return sortConfig.direction === 'asc' ? ' ↑' : ' ↓';
   };
 
-  const formatNumber = (value: number | null | undefined) => {
-    const safeValue = typeof value === 'number' ? value : 0;
-    return safeValue.toLocaleString('ru-RU', CURRENCY_FORMAT_OPTIONS);
-  };
-
-  const formatNumberWithSign = (value: number | null | undefined) => {
-    const safeValue = typeof value === 'number' ? value : 0;
-    return safeValue.toLocaleString('ru-RU', CURRENCY_FORMAT_OPTIONS_WITH_SIGN);
+  const renderAmount = (transaction: Transaction) => {
+    const amount = Math.abs(transaction.amount).toFixed(2);
+    const isExpense = transaction.isExpense;
+    const color = isExpense ? 'text-white' : 'text-green-400';
+    return (
+      <span className={`font-medium ${color}`}>
+        {isExpense ? '-' : '+'}{amount} ₽
+      </span>
+    );
   };
 
   return (
-    <div className={`${STYLES.background} rounded-lg shadow overflow-hidden mb-8`}>
-      <div className={`p-6 border-b ${STYLES.border}`}>
+    <div className="mt-6 bg-gray-800 rounded-lg overflow-hidden shadow-xl">
+      <div className="p-6 border-b border-gray-700">
         <div className="flex justify-between items-center">
           <div>
-            <h3 className={`text-xl font-semibold ${STYLES.text}`}>{selectedCategory}</h3>
-            <p className={STYLES.textDimmed}>Количество транзакций: {currentData.transactions.length}</p>
-            <p className={`text-base font-medium mt-2 ${STYLES.text}`}>
-              Общая сумма: {' '}
-              <span className={`text-lg font-bold ${
-                (currentData.total || 0) >= 0 ? STYLES.positiveAmount : STYLES.negativeAmount
-              }`}>
-                {formatNumber(currentData.total)}
-              </span>
-            </p>
-            <p className={`text-base font-medium ${STYLES.text}`}>
-              Общий кэшбэк: {' '}
-              <span className={`text-lg font-bold ${STYLES.cashback}`}>
-                {formatNumber(currentData.totalCashback)}
-              </span>
-            </p>
-            {hasSelectedTransactions && (
-              <p className={`text-base font-medium mt-2 ${STYLES.text}`}>
-                Выбрано: {' '}
-                <span className={`text-lg font-bold ${STYLES.selected}`}>
-                  {formatNumber(getSelectedTotal())}
+            <h3 className="text-xl font-semibold text-white mb-2">
+              {selectedCategory}
+            </h3>
+            <div className="space-y-1">
+              <p className="text-gray-400">
+                Всего транзакций: <span className="text-white">{currentData.transactions.length}</span>
+              </p>
+              <p className="text-gray-400">
+                Общая сумма: <span className={currentData.total >= 0 ? 'text-green-400' : 'text-white'}>
+                  {currentData.total >= 0 ? '+' : ''}{currentData.total.toFixed(2)} ₽
                 </span>
               </p>
-            )}
+              {currentData.totalCashback > 0 && (
+                <p className="text-gray-400">
+                  Общий кэшбэк: <span className="text-blue-400">{currentData.totalCashback.toFixed(2)} ₽</span>
+                </p>
+              )}
+            </div>
           </div>
           <button
             onClick={onTransferClick}
-            disabled={!hasSelectedTransactions}
-            className={`px-4 py-2 rounded-md text-sm transition-colors ${
-              hasSelectedTransactions
-                ? STYLES.button.primary
-                : STYLES.button.disabled
+            disabled={!Object.values(selectedTransactions).some(Boolean)}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              Object.values(selectedTransactions).some(Boolean)
+                ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                : 'bg-gray-700 text-gray-400 cursor-not-allowed'
             }`}
           >
-            Перенести
+            Перенести выбранные
           </button>
         </div>
       </div>
-      <div className="overflow-x-auto max-h-[calc(100vh-300px)] overflow-y-auto relative">
-        <table className="min-w-full divide-y divide-gray-700">
-          <thead className={`${STYLES.backgroundDark} sticky top-0 z-10`}>
-            <tr>
-              <th className={`px-6 py-3 text-left text-xs font-medium ${STYLES.textMuted} uppercase tracking-wider ${STYLES.backgroundDark}`}>
-                №
-              </th>
-              <th className={`px-6 py-3 text-left text-xs font-medium ${STYLES.textMuted} ${STYLES.backgroundDark}`}>
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={onSelectAll}
-                  className="h-4 w-4 text-indigo-600 rounded border-gray-600"
-                />
-              </th>
-              {TABLE_COLUMNS.map(column => (
-                <th 
-                  key={column.key}
-                  className={`px-6 py-3 text-left text-xs font-medium ${STYLES.textMuted} uppercase tracking-wider cursor-pointer hover:text-indigo-400 ${STYLES.backgroundDark}`}
-                  onClick={() => onSort(column.key as any)}
-                >
-                  {column.label}
-                  {sortConfig.key === column.key && (
-                    <span className="ml-1">
-                      {sortConfig.direction === 'asc' ? '↑' : '↓'}
-                    </span>
-                  )}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className={`${STYLES.background} divide-y ${STYLES.border}`}>
-            {currentData.transactions.map((transaction, index) => (
-              <tr 
-                key={index} 
-                className={`${STYLES.hover} border-b ${STYLES.border}`}
-              >
-                <td className={`px-6 py-4 whitespace-nowrap text-sm ${STYLES.textDimmed}`}>
-                  {index + 1}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
+
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className="bg-gray-900">
+              <th className="px-6 py-3 border-b border-gray-700">
+                <div className="flex items-center justify-center">
                   <input
                     type="checkbox"
-                    checked={selectedTransactions[index] || false}
-                    onChange={() => onTransactionSelect(index)}
-                    className="h-4 w-4 text-indigo-600 rounded border-gray-600"
+                    onChange={onSelectAll}
+                    checked={
+                      currentData.transactions.length > 0 &&
+                      currentData.transactions.every((_, index) => selectedTransactions[index])
+                    }
+                    className="rounded border-gray-600 text-indigo-600 focus:ring-indigo-500"
                   />
+                </div>
+              </th>
+              <th
+                className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider border-b border-gray-700 cursor-pointer hover:text-white"
+                onClick={() => onSort('date')}
+              >
+                Дата{renderSortArrow('date')}
+              </th>
+              <th
+                className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider border-b border-gray-700 cursor-pointer hover:text-white"
+                onClick={() => onSort('amount')}
+              >
+                Сумма{renderSortArrow('amount')}
+              </th>
+              <th
+                className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider border-b border-gray-700 cursor-pointer hover:text-white"
+                onClick={() => onSort('description')}
+              >
+                Описание{renderSortArrow('description')}
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider border-b border-gray-700">
+                Статус
+              </th>
+              {currentData.transactions.some(t => t.cashback !== undefined) && (
+                <th
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider border-b border-gray-700 cursor-pointer hover:text-white"
+                  onClick={() => onSort('cashback')}
+                >
+                  Кэшбэк{renderSortArrow('cashback')}
+                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-700">
+            {currentData.transactions.map((transaction, index) => (
+              <tr
+                key={index}
+                className={`hover:bg-gray-700 transition-colors ${
+                  index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-850'
+                }`}
+              >
+                <td className="px-6 py-4">
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={selectedTransactions[index] || false}
+                      onChange={() => onTransactionSelect(index)}
+                      className="rounded border-gray-600 text-indigo-600 focus:ring-indigo-500"
+                    />
+                  </div>
                 </td>
-                <td className={`px-6 py-4 whitespace-nowrap text-sm ${STYLES.textMuted}`}>
+                <td className="px-6 py-4 text-sm text-gray-300">
                   {transaction.date}
                 </td>
-                <td className={`px-6 py-4 whitespace-nowrap text-base font-bold ${
-                  (transaction.amount || 0) > 0 ? STYLES.positiveAmount : STYLES.negativeAmount
-                }`}>
-                  {formatNumberWithSign(transaction.amount)}
+                <td className="px-6 py-4 text-sm">
+                  {renderAmount(transaction)}
                 </td>
-                <td className={`px-6 py-4 whitespace-nowrap text-sm ${STYLES.textMuted}`}>
+                <td className="px-6 py-4 text-sm text-gray-300">
                   {transaction.description}
                 </td>
-                <td className={`px-6 py-4 whitespace-nowrap text-sm ${STYLES.textMuted}`}>
-                  {transaction.cardNumber}
-                </td>
-                <td className={`px-6 py-4 whitespace-nowrap text-sm ${STYLES.textMuted}`}>
+                <td className="px-6 py-4 text-sm text-gray-300">
                   {transaction.status}
                 </td>
+                {transaction.cashback !== undefined && (
+                  <td className="px-6 py-4 text-sm text-blue-400">
+                    {transaction.cashback.toFixed(2)} ₽
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

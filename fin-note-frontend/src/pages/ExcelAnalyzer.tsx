@@ -16,6 +16,8 @@ import TransferMenu from '../components/excel/TransferMenu';
 import AddCategoryModal from '../components/excel/AddCategoryModal';
 import CategoryButtons from '../components/excel/CategoryButtons';
 import TransactionsTable from '../components/excel/TransactionsTable';
+import { BankType, TinkoffRow, SberbankRow } from '../types/banks';
+import { processTinkoffRow, processSberbankRow, groupTransactionsByCategory } from '../utils/bankStatements';
 
 const ExcelAnalyzer: React.FC = () => {
   const { user, logout } = useAuth();
@@ -29,6 +31,7 @@ const ExcelAnalyzer: React.FC = () => {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: null, direction: null });
   const [isTransferMenuOpen, setIsTransferMenuOpen] = useState(false);
   const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
+  const [selectedBank, setSelectedBank] = useState<BankType>(BankType.TINKOFF);
 
   // Инициализация состояния при монтировании
   useEffect(() => {
@@ -90,20 +93,36 @@ const ExcelAnalyzer: React.FC = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    dispatch(resetState());
-    setSelectedCategory('');
-    setCurrentData(null);
-    setSelectedTransactions({});
-    setSortConfig({ key: null, direction: null });
-
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const content = e.target?.result as string;
-        const state = JSON.parse(content);
-        dispatch(loadStateFromJson(state));
+        const parsedData = JSON.parse(content);
+        
+        // Проверяем структуру загруженных данных
+        if (!parsedData || typeof parsedData !== 'object' || !parsedData.categories) {
+          throw new Error('Неверный формат JSON файла');
+        }
+
+        // Сбрасываем текущее состояние
+        dispatch(resetState());
+        setSelectedCategory('');
+        setCurrentData(null);
+        setSelectedTransactions({});
+        setSortConfig({ key: null, direction: null });
+
+        // Загружаем новые данные
+        dispatch(loadStateFromJson({ categories: parsedData.categories }));
+
+        // Выбираем первую доступную категорию
+        const firstCategory = Object.keys(parsedData.categories)[0];
+        if (firstCategory) {
+          setSelectedCategory(firstCategory);
+          setCurrentData(parsedData.categories[firstCategory]);
+        }
       } catch (error) {
-        console.error('Error loading JSON:', error);
+        console.error('Ошибка при загрузке JSON:', error);
+        alert('Ошибка при загрузке файла. Проверьте формат файла.');
       }
     };
     reader.readAsText(file);
@@ -112,80 +131,43 @@ const ExcelAnalyzer: React.FC = () => {
   const processExcelFile = useCallback((file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
-      dispatch(resetState());
-      const data = e.target?.result;
-      const workbook = XLSX.read(data, { type: 'binary' });
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      try {
+        dispatch(resetState());
+        const data = e.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, any>[];
 
-      const processedTransactions = jsonData.map((row: any) => {
-        const category = row['Категория'] || 'Прочее';
-        
-        // Форматирование даты
-        const operationDate = row['Дата операции'];
-        const paymentDate = row['Дата платежа'];
-        let dateToUse = '';
-        
-        try {
-          if (operationDate) {
-            const [day, month, year] = operationDate.split('.');
-            if (day && month && year) {
-              const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-              if (!isNaN(date.getTime())) {
-                dateToUse = `${day}.${month}.${year}`;
-              }
+        if (jsonData.length > 0) {
+          console.log('Первая строка данных:', jsonData[0]);
+          console.log('Ключи первой строки:', Object.keys(jsonData[0]));
+          console.log('Всего строк:', jsonData.length);
+
+          const processedTransactions = jsonData.map((row) => {
+            if (selectedBank === BankType.TINKOFF) {
+              return processTinkoffRow(row as TinkoffRow);
+            } else {
+              return processSberbankRow(row as SberbankRow);
             }
+          });
+
+          const categorizedData = groupTransactionsByCategory(processedTransactions);
+          dispatch(setCategories(categorizedData));
+
+          // Выбираем первую доступную категорию
+          const firstCategory = Object.keys(categorizedData)[0];
+          if (firstCategory) {
+            setSelectedCategory(firstCategory);
+            setCurrentData(categorizedData[firstCategory]);
           }
-          
-          if (!dateToUse && paymentDate) {
-            const [day, month, year] = paymentDate.split('.');
-            if (day && month && year) {
-              const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-              if (!isNaN(date.getTime())) {
-                dateToUse = `${day}.${month}.${year}`;
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error parsing date:', error, { operationDate, paymentDate });
         }
-
-        return {
-          date: dateToUse,
-          amount: parseFloat(row['Сумма операции'] || 0),
-          description: row['Описание'] || '',
-          category: category,
-          mccCode: row['MCC'] || '',
-          status: row['Статус'] || '',
-          paymentType: row['Тип операции'] || '',
-          cardNumber: row['Номер карты'] || '',
-          cashback: parseFloat(row['Кэшбэк'] || 0)
-        };
-      });
-
-      // Группировка транзакций по категориям
-      const categoriesData = processedTransactions.reduce((acc: { [key: string]: CategoryData }, curr) => {
-        if (!acc[curr.category]) {
-          acc[curr.category] = { total: 0, totalCashback: 0, transactions: [] };
-        }
-        acc[curr.category].total += curr.amount;
-        acc[curr.category].totalCashback += curr.cashback;
-        acc[curr.category].transactions.push(curr);
-        return acc;
-      }, {});
-
-      dispatch(setCategories(categoriesData));
-      
-      // Выбираем первую доступную категорию
-      const firstCategory = Object.keys(categoriesData)[0];
-      if (firstCategory) {
-        setSelectedCategory(firstCategory);
-        setCurrentData(categoriesData[firstCategory]);
+      } catch (error) {
+        console.error('Ошибка при обработке файла:', error);
       }
     };
     reader.readAsBinaryString(file);
-  }, [dispatch]);
+  }, [dispatch, selectedBank]);
 
   const handleCategoryClick = (category: string, data: CategoryData) => {
     setSelectedCategory(category);
@@ -258,7 +240,7 @@ const ExcelAnalyzer: React.FC = () => {
     // Обновляем исходную категорию
     const updatedSourceData = {
       total: remainingTransactions.reduce((sum, t) => sum + t.amount, 0),
-      totalCashback: remainingTransactions.reduce((sum, t) => sum + t.cashback, 0),
+      totalCashback: remainingTransactions.reduce((sum, t) => sum + (t.cashback || 0), 0),
       transactions: remainingTransactions
     };
 
@@ -266,7 +248,7 @@ const ExcelAnalyzer: React.FC = () => {
     const targetData = categories[targetCategory] || { total: 0, totalCashback: 0, transactions: [] };
     const updatedTargetData = {
       total: targetData.total + transferringTransactions.reduce((sum, t) => sum + t.amount, 0),
-      totalCashback: targetData.totalCashback + transferringTransactions.reduce((sum, t) => sum + t.cashback, 0),
+      totalCashback: targetData.totalCashback + transferringTransactions.reduce((sum, t) => sum + (t.cashback || 0), 0),
       transactions: [...targetData.transactions, ...transferringTransactions]
     };
 
@@ -279,11 +261,11 @@ const ExcelAnalyzer: React.FC = () => {
       setSelectedCategory('');
       setCurrentData(null);
     } else {
-      newCategories[selectedCategory] = updatedSourceData;
-      setCurrentData(updatedSourceData);
+      newCategories[selectedCategory] = updatedSourceData as CategoryData;
+      setCurrentData(updatedSourceData as CategoryData);
     }
     
-    newCategories[targetCategory] = updatedTargetData;
+    newCategories[targetCategory] = updatedTargetData as CategoryData;
 
     // Обновляем состояние
     dispatch(setCategories(newCategories));
@@ -316,9 +298,14 @@ const ExcelAnalyzer: React.FC = () => {
     <div className="min-h-screen bg-gray-900">
       <header className="bg-gray-800 shadow">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className={`text-2xl font-bold ${STYLES.text}`}>
-            Анализ банковской выписки
-          </h1>
+          <div>
+            <h1 className={`text-2xl font-bold ${STYLES.text}`}>
+              Анализ банковской выписки
+            </h1>
+            <p className={`mt-2 ${STYLES.textMuted}`}>
+              Выбранный банк: {selectedBank === BankType.TINKOFF ? 'Тинькофф' : 'Сбербанк'}
+            </p>
+          </div>
           <div className="flex gap-2">
             <button
               onClick={handleReset}
@@ -338,8 +325,32 @@ const ExcelAnalyzer: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h2 className={`text-xl font-semibold ${STYLES.text} mb-4`}>Выберите способ загрузки данных:</h2>
+          <h2 className={`text-xl font-semibold ${STYLES.text} mb-4`}>Выберите банк и способ загрузки данных:</h2>
+          
           <div className="flex gap-4 mb-6">
+            <button
+              onClick={() => setSelectedBank(BankType.TINKOFF)}
+              className={`px-6 py-3 rounded-lg text-white transition-colors ${
+                selectedBank === BankType.TINKOFF
+                  ? 'bg-indigo-600'
+                  : 'bg-gray-700 hover:bg-gray-600'
+              }`}
+            >
+              Тинькофф
+            </button>
+            <button
+              onClick={() => setSelectedBank(BankType.SBERBANK)}
+              className={`px-6 py-3 rounded-lg text-white transition-colors ${
+                selectedBank === BankType.SBERBANK
+                  ? 'bg-indigo-600'
+                  : 'bg-gray-700 hover:bg-gray-600'
+              }`}
+            >
+              Сбербанк
+            </button>
+          </div>
+
+          <div className="flex gap-4">
             <div className={`flex-1 ${STYLES.background} p-6 rounded-lg`}>
               <h3 className={`text-lg font-medium ${STYLES.text} mb-3`}>Загрузка из JSON</h3>
               <div className="flex gap-2">
@@ -370,7 +381,9 @@ const ExcelAnalyzer: React.FC = () => {
               </div>
             </div>
             <div className={`flex-1 ${STYLES.background} p-6 rounded-lg`}>
-              <h3 className={`text-lg font-medium ${STYLES.text} mb-3`}>Загрузка из Excel</h3>
+              <h3 className={`text-lg font-medium ${STYLES.text} mb-3`}>
+                Загрузка выписки {selectedBank === BankType.TINKOFF ? 'Тинькофф' : 'Сбербанк'}
+              </h3>
               <div
                 {...getRootProps()}
                 className={`border-2 border-dashed p-4 text-center rounded-lg ${
@@ -381,7 +394,9 @@ const ExcelAnalyzer: React.FC = () => {
                 <p className={STYLES.textMuted}>
                   {isDragActive
                     ? 'Отпустите файл здесь...'
-                    : 'Перетащите Excel файл сюда или кликните для выбора'}
+                    : `Перетащите Excel файл выписки ${
+                        selectedBank === BankType.TINKOFF ? 'Тинькофф' : 'Сбербанк'
+                      } сюда или кликните для выбора`}
                 </p>
               </div>
             </div>

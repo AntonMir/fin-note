@@ -1,36 +1,19 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-
-interface Transaction {
-  date: string;
-  amount: number;
-  description: string;
-  category: string;
-  mccCode: string;
-  status: string;
-  paymentType: string;
-  cardNumber: string;
-  cashback: number;
-}
-
-interface CategoryData {
-  total: number;
-  totalCashback: number;
-  transactions: Transaction[];
-}
+import { Categories } from '../types/banks';
 
 interface TableState {
-  categories: { [key: string]: CategoryData };
+  categories: Categories;
 }
 
 const initialState: TableState = {
-  categories: {},
+  categories: {}
 };
 
 const tableSlice = createSlice({
   name: 'tables',
   initialState,
   reducers: {
-    setCategories: (state, action: PayloadAction<{ [key: string]: CategoryData }>) => {
+    setCategories: (state, action: PayloadAction<Categories>) => {
       state.categories = action.payload;
     },
     loadStateFromJson: (state, action: PayloadAction<TableState>) => {
@@ -38,8 +21,8 @@ const tableSlice = createSlice({
     },
     resetState: (state) => {
       state.categories = {};
-    },
-  },
+    }
+  }
 });
 
 export const { setCategories, loadStateFromJson, resetState } = tableSlice.actions;
