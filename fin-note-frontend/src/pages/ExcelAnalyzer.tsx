@@ -31,7 +31,10 @@ const ExcelAnalyzer: React.FC = () => {
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: null, direction: null });
   const [isTransferMenuOpen, setIsTransferMenuOpen] = useState(false);
   const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
-  const [selectedBank, setSelectedBank] = useState<BankType>(BankType.TINKOFF);
+  const [selectedBank, setSelectedBank] = useState<BankType>(() => {
+    const savedBank = localStorage.getItem('selectedBank');
+    return savedBank ? (savedBank as BankType) : BankType.TINKOFF;
+  });
 
   // Инициализация состояния при монтировании
   useEffect(() => {
@@ -294,6 +297,11 @@ const ExcelAnalyzer: React.FC = () => {
     accept: EXCEL_FILE_TYPES
   });
 
+  const handleBankSelect = (bank: BankType) => {
+    setSelectedBank(bank);
+    localStorage.setItem('selectedBank', bank);
+  };
+
   return (
     <div className="min-h-screen bg-gray-900">
       <header className="bg-gray-800 shadow">
@@ -329,7 +337,7 @@ const ExcelAnalyzer: React.FC = () => {
           
           <div className="flex gap-4 mb-6">
             <button
-              onClick={() => setSelectedBank(BankType.TINKOFF)}
+              onClick={() => handleBankSelect(BankType.TINKOFF)}
               className={`px-6 py-3 rounded-lg text-white transition-colors ${
                 selectedBank === BankType.TINKOFF
                   ? 'bg-indigo-600'
@@ -339,7 +347,7 @@ const ExcelAnalyzer: React.FC = () => {
               Тинькофф
             </button>
             <button
-              onClick={() => setSelectedBank(BankType.SBERBANK)}
+              onClick={() => handleBankSelect(BankType.SBERBANK)}
               className={`px-6 py-3 rounded-lg text-white transition-colors ${
                 selectedBank === BankType.SBERBANK
                   ? 'bg-indigo-600'
