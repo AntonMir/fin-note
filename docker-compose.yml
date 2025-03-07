@@ -10,4 +10,5 @@ services:
     volumes:
       - ./fin-note-frontend/src:/app/src
     environment:
-      - NODE_ENV=development 
+      - NODE_ENV=development
+    restart: always
